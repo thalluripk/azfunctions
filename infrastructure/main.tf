@@ -110,7 +110,7 @@ resource "azurerm_function_app_flex_consumption" "function_app" {
   service_plan_id     = azurerm_service_plan.plan.id
 
   storage_container_type      = "blobContainer"
-  storage_container_endpoint  = "${azurerm_storage_account.storage.primary_blob_endpoint}${azurerm_storage_account.storage.name}"
+  storage_container_endpoint  = azurerm_storage_account.storage.primary_blob_endpoint
   storage_authentication_type = "StorageAccountConnectionString"
   storage_access_key          = azurerm_storage_account.storage.primary_access_key
   runtime_name                = "dotnet-isolated"
