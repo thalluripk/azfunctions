@@ -42,6 +42,7 @@ jobs:
               with:
                   name: ${{ env.ARTIFACT_NAME }}
                   path: ${{ runner.temp }}/publish
+                  include-hidden-files: true # CRITICAL: Includes the .azurefunctions metadata folder
 
     terraform-plan:
         runs-on: ubuntu-latest
@@ -152,6 +153,7 @@ jobs:
                   app-name: ${{ secrets.FUNCTION_APP_NAME }}
                   package: ${{ runner.temp }}/publish
                   publish-profile: ${{ secrets.FUNCTION_APP_PUBLISH_PROFILE }}
+                  remote-build: true # MANDATORY: Required for Flex Consumption apps
 
             - name: Run Smoke Tests
               run: |
