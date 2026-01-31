@@ -109,7 +109,7 @@ jobs:
 
             - name: Terraform Init
               working-directory: ./infrastructure
-              run: terraform init -backend-config backend-config.hcl
+              run: terraform init -upgrade -backend-config backend-config.hcl
               env:
                   ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
                   ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
