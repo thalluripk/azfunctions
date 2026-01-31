@@ -121,6 +121,13 @@ resource "azurerm_linux_function_app" "function_app" {
     runtime_scale_monitoring_enabled = true
   }
 
+  function_app_config {
+    deployment {
+      storage_account_name       = azurerm_storage_account.storage.name
+      storage_account_access_key = azurerm_storage_account.storage.primary_access_key
+    }
+  }
+
   identity {
     type = "SystemAssigned"
   }
