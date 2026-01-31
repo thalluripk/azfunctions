@@ -18,6 +18,7 @@ terraform {
 
 provider "azurerm" {
   features {}
+  subscription_id = "fba18915-b6c5-401f-86a6-9fb245012d60"
 }
 
 # Variables
@@ -102,48 +103,30 @@ resource "azurerm_service_plan" "plan" {
 }
 
 # Linux Function App (Flex Consumption)
-resource "azurerm_linux_function_app" "function_app" {
+resource "azurerm_function_app_flex_consumption" "function_app" {
   name                = "${var.app_name}-${var.environment}-func"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   service_plan_id     = azurerm_service_plan.plan.id
 
-  storage_account_name       = azurerm_storage_account.storage.name
-  storage_account_access_key = azurerm_storage_account.storage.primary_access_key
-
-   # MANDATORY for Flex Consumption (FC1)
-  function_app_config {
-    deployment {
-      storage {
-        type = "blobContainer"
-        # Ensure you create this container or use a specific one
-        container_id = "${azurerm_storage_account.storage.primary_blob_endpoint}app-package"
-      }
-    }
-    runtime {
-      name    = "dotnet-isolated"
-      version = "8.0"
-    }
-    scale {
-      always_ready_instances = 0
-      instance_memory_mb     = 2048
-    }
-  }
+  storage_container_type      = "blobContainer"
+  storage_container_endpoint       = "${azurerm_storage_account.storage.primary_blob_endpoint}${azurerm_storage_account.storage.name}"
+  storage_authentication_type = "StorageAccountConnectionString"
+  storage_access_key = azurerm_storage_account.storage.primary_access_key
+  runtime_name                = "dotnet-isolated"
+  runtime_version             = "8.0"
+  maximum_instance_count      = 50
+  instance_memory_in_mb       = 2048
 
   app_settings = {
     APPINSIGHTS_INSTRUMENTATIONKEY             = azurerm_application_insights.appinsights.instrumentation_key
     APPLICATIONINSIGHTS_CONNECTION_STRING       = azurerm_application_insights.appinsights.connection_string
     AzureWebJobsStorage                         = "DefaultEndpointsProtocol=https;AccountName=${azurerm_storage_account.storage.name};AccountKey=${azurerm_storage_account.storage.primary_access_key};EndpointSuffix=core.windows.net"
-    FUNCTIONS_WORKER_RUNTIME                    = "dotnet-isolated"
     FUNCTIONS_EXTENSION_VERSION                 = "~4"
     FUNCTION_APP_EDIT_MODE                      = "readonly"
   }
 
   site_config {
-    application_stack {
-      dotnet_version              = "8.0"
-      use_dotnet_isolated_runtime = true
-    }
     minimum_tls_version = "1.2"
     http2_enabled       = true
   }
@@ -156,31 +139,27 @@ resource "azurerm_linux_function_app" "function_app" {
     resource_name = "function_app"
   })
 
-  depends_on = [
-    azurerm_service_plan.plan,
-    azurerm_storage_account.storage,
-    azurerm_application_insights.appinsights
-  ]
+
 }
 
 # Outputs
 output "function_app_id" {
-  value       = azurerm_linux_function_app.function_app.id
+  value       = azurerm_function_app_flex_consumption.function_app.id
   description = "Function App ID"
 }
 
 output "function_app_name" {
-  value       = azurerm_linux_function_app.function_app.name
+  value       = azurerm_function_app_flex_consumption.function_app.name
   description = "Function App Name"
 }
 
 output "function_app_default_hostname" {
-  value       = azurerm_linux_function_app.function_app.default_hostname
+  value       = azurerm_function_app_flex_consumption.function_app.default_hostname
   description = "Function App Default Hostname"
 }
 
 output "function_app_principal_id" {
-  value       = azurerm_linux_function_app.function_app.identity[0].principal_id
+  value       = azurerm_function_app_flex_consumption.function_app.identity[0].principal_id
   description = "Function App Principal ID for RBAC"
 }
 

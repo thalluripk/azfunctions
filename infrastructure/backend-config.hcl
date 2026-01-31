@@ -3,7 +3,7 @@
 # 
 # Usage: terraform init -backend-config=backend-config.hcl
 #
-# resource_group_name  = "rg-terraform-state"
-# storage_account_name = "tfstate1234567890"
-# container_name       = "tfstate"
-# key                  = "azfunctions/terraform.tfstate"
+resource_group_name  = "rg-terraform-state"
+storage_account_name = "lorotfstate"
+container_name       = "tfstate"
+key                  = "azfunctions.tfstate"
