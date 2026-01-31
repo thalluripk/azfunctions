@@ -2,8 +2,8 @@ terraform {
   required_version = ">= 1.0"
   required_providers {
     azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 3.0"
+        source  = "hashicorp/azurerm"
+        version = "~> 3.102" # Upgraded to support Flex Consumption
     }
   }
 
@@ -107,8 +107,28 @@ resource "azurerm_linux_function_app" "function_app" {
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   service_plan_id     = azurerm_service_plan.plan.id
+
   storage_account_name       = azurerm_storage_account.storage.name
   storage_account_access_key = azurerm_storage_account.storage.primary_access_key
+
+   # MANDATORY for Flex Consumption (FC1)
+  function_app_config {
+    deployment {
+      storage {
+        type = "blobContainer"
+        # Ensure you create this container or use a specific one
+        container_id = "${azurerm_storage_account.storage.primary_blob_endpoint}app-package"
+      }
+    }
+    runtime {
+      name    = "dotnet-isolated"
+      version = "8.0"
+    }
+    scale {
+      always_ready_instances = 0
+      instance_memory_mb     = 2048
+    }
+  }
 
   app_settings = {
     APPINSIGHTS_INSTRUMENTATIONKEY             = azurerm_application_insights.appinsights.instrumentation_key
