@@ -85,7 +85,9 @@ resource "azurerm_service_plan" "plan" {
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   os_type             = "Linux"
-  sku_name            = "FC1"  zone_balancing_enabled = false  tags                = var.tags
+  sku_name            = "FC1"
+  zone_balancing_enabled = false
+  tags                = var.tags
 
   depends_on = [azurerm_resource_group.rg]
 }
