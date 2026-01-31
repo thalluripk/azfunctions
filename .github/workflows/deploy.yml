@@ -35,7 +35,9 @@ jobs:
               run: dotnet build --configuration Release --no-restore
 
             - name: Publish Function App
-              run: dotnet publish -c Release -o ${{ runner.temp }}/publish
+              run: |
+                  dotnet publish -c Release -o ${{ runner.temp }}/publish
+                  ls -la ${{ runner.temp }}/publish # This should list .azurefunctions folder
 
             - name: Upload artifact
               uses: actions/upload-artifact@v4
@@ -153,7 +155,6 @@ jobs:
                   app-name: ${{ secrets.FUNCTION_APP_NAME }}
                   package: ${{ runner.temp }}/publish
                   publish-profile: ${{ secrets.FUNCTION_APP_PUBLISH_PROFILE }}
-                  remote-build: true # MANDATORY: Required for Flex Consumption apps
 
             - name: Run Smoke Tests
               run: |
