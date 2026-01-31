@@ -69,6 +69,12 @@ resource "azurerm_storage_account" "storage" {
   depends_on = [azurerm_resource_group.rg]
 }
 
+resource "azurerm_storage_container" "container" {
+  name                  = "funcblobcontainer"
+  storage_account_id    = azurerm_storage_account.storage.id
+  container_access_type = "private"
+}
+
 resource "azurerm_log_analytics_workspace" "example" {
   name                = "${var.app_name}-${var.environment}-la"
   location            = azurerm_resource_group.rg.location
@@ -110,9 +116,8 @@ resource "azurerm_function_app_flex_consumption" "function_app" {
   service_plan_id     = azurerm_service_plan.plan.id
 
   storage_container_type      = "blobContainer"
-  storage_container_endpoint  = azurerm_storage_account.storage.primary_blob_endpoint
-  storage_authentication_type = "StorageAccountConnectionString"
-  storage_access_key          = azurerm_storage_account.storage.primary_access_key
+  storage_container_endpoint  = "${azurerm_storage_account.storage.primary_blob_endpoint}${azurerm_storage_container.container.name}"
+  storage_authentication_type = "SystemAssignedIdentity"
   runtime_name                = "dotnet-isolated"
   runtime_version             = "8.0"
   maximum_instance_count      = 50
