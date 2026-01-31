@@ -2,8 +2,8 @@ terraform {
   required_version = ">= 1.0"
   required_providers {
     azurerm = {
-        source  = "hashicorp/azurerm"
-        version = ">= 3.102.0" # Force a minimum of 3.102
+      source  = "hashicorp/azurerm"
+      version = ">= 3.102.0" # Force a minimum of 3.102
     }
   }
 
@@ -84,20 +84,20 @@ resource "azurerm_application_insights" "appinsights" {
   resource_group_name = azurerm_resource_group.rg.name
   application_type    = "web"
   tags                = var.tags
-  workspace_id = azurerm_log_analytics_workspace.example.id
+  workspace_id        = azurerm_log_analytics_workspace.example.id
 
   depends_on = [azurerm_resource_group.rg]
 }
 
 # Service Plan (Flex Consumption)
 resource "azurerm_service_plan" "plan" {
-  name                = "${var.app_name}-${var.environment}-plan"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-  os_type             = "Linux"
-  sku_name            = "FC1"
+  name                   = "${var.app_name}-${var.environment}-plan"
+  location               = azurerm_resource_group.rg.location
+  resource_group_name    = azurerm_resource_group.rg.name
+  os_type                = "Linux"
+  sku_name               = "FC1"
   zone_balancing_enabled = false
-  tags                = var.tags
+  tags                   = var.tags
 
   depends_on = [azurerm_resource_group.rg]
 }
@@ -110,20 +110,20 @@ resource "azurerm_function_app_flex_consumption" "function_app" {
   service_plan_id     = azurerm_service_plan.plan.id
 
   storage_container_type      = "blobContainer"
-  storage_container_endpoint       = "${azurerm_storage_account.storage.primary_blob_endpoint}${azurerm_storage_account.storage.name}"
+  storage_container_endpoint  = "${azurerm_storage_account.storage.primary_blob_endpoint}${azurerm_storage_account.storage.name}"
   storage_authentication_type = "StorageAccountConnectionString"
-  storage_access_key = azurerm_storage_account.storage.primary_access_key
+  storage_access_key          = azurerm_storage_account.storage.primary_access_key
   runtime_name                = "dotnet-isolated"
   runtime_version             = "8.0"
   maximum_instance_count      = 50
   instance_memory_in_mb       = 2048
 
   app_settings = {
-    APPINSIGHTS_INSTRUMENTATIONKEY             = azurerm_application_insights.appinsights.instrumentation_key
-    APPLICATIONINSIGHTS_CONNECTION_STRING       = azurerm_application_insights.appinsights.connection_string
-    AzureWebJobsStorage                         = "DefaultEndpointsProtocol=https;AccountName=${azurerm_storage_account.storage.name};AccountKey=${azurerm_storage_account.storage.primary_access_key};EndpointSuffix=core.windows.net"
-    FUNCTIONS_EXTENSION_VERSION                 = "~4"
-    FUNCTION_APP_EDIT_MODE                      = "readonly"
+    APPINSIGHTS_INSTRUMENTATIONKEY        = azurerm_application_insights.appinsights.instrumentation_key
+    APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.appinsights.connection_string
+    AzureWebJobsStorage                   = "DefaultEndpointsProtocol=https;AccountName=${azurerm_storage_account.storage.name};AccountKey=${azurerm_storage_account.storage.primary_access_key};EndpointSuffix=core.windows.net"
+    FUNCTIONS_EXTENSION_VERSION           = "~4"
+    FUNCTION_APP_EDIT_MODE                = "readonly"
   }
 
   site_config {

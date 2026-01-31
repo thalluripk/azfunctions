@@ -19,7 +19,7 @@ public class LoroHttpTrigger
     [Function("LoroHttpTrigger")]
     public async Task<IActionResult> Run([HttpTrigger(AuthorizationLevel.Function, "get", "post")] HttpRequest req)
     {
-        _logger.LogInformation("C# HTTP trigger function processed a request.");
+        _logger.LogInformation("C# HTTP trigger function processed a request. This is loro");
 
         string? name = null;
         string? email = null;
