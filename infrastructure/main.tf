@@ -64,9 +64,6 @@ resource "azurerm_storage_account" "storage" {
   location                 = azurerm_resource_group.rg.location
   account_tier             = "Standard"
   account_replication_type = "LRS"
-  tags                     = var.tags
-
-  depends_on = [azurerm_resource_group.rg]
 }
 
 resource "azurerm_storage_container" "container" {
@@ -97,75 +94,203 @@ resource "azurerm_application_insights" "appinsights" {
 
 # Service Plan (Flex Consumption)
 resource "azurerm_service_plan" "plan" {
-  name                   = "${var.app_name}-${var.environment}-plan"
-  location               = azurerm_resource_group.rg.location
-  resource_group_name    = azurerm_resource_group.rg.name
-  os_type                = "Linux"
-  sku_name               = "FC1"
-  zone_balancing_enabled = false
-  tags                   = var.tags
-
-  depends_on = [azurerm_resource_group.rg]
+  name                = "${var.app_name}-${var.environment}-plan"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  os_type             = "Windows"
+  sku_name            = "Y1"
 }
 
-# Linux Function App (Flex Consumption)
-resource "azurerm_function_app_flex_consumption" "function_app" {
+resource "azurerm_windows_function_app" "function_app" {
   name                = "${var.app_name}-${var.environment}-func"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
-  service_plan_id     = azurerm_service_plan.plan.id
 
-  storage_container_type      = "blobContainer"
-  storage_container_endpoint  = "${azurerm_storage_account.storage.primary_blob_endpoint}${azurerm_storage_container.container.name}"
-  storage_authentication_type = "SystemAssignedIdentity"
-  runtime_name                = "dotnet-isolated"
-  runtime_version             = "8.0"
-  maximum_instance_count      = 50
-  instance_memory_in_mb       = 2048
+  service_plan_id = azurerm_service_plan.plan.id
 
-  app_settings = {
-    APPINSIGHTS_INSTRUMENTATIONKEY        = azurerm_application_insights.appinsights.instrumentation_key
-    APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.appinsights.connection_string
-    AzureWebJobsStorage                   = "DefaultEndpointsProtocol=https;AccountName=${azurerm_storage_account.storage.name};AccountKey=${azurerm_storage_account.storage.primary_access_key};EndpointSuffix=core.windows.net"
-    FUNCTIONS_EXTENSION_VERSION           = "~4"
-    FUNCTION_APP_EDIT_MODE                = "readonly"
-  }
+  storage_account_name       = azurerm_storage_account.storage.name
+  storage_account_access_key = azurerm_storage_account.storage.primary_access_key
 
   site_config {
-    minimum_tls_version = "1.2"
-    http2_enabled       = true
+    minimum_tls_version                    = "1.2"
+    http2_enabled                          = true
+    application_insights_connection_string = azurerm_application_insights.appinsights.connection_string
+    application_insights_key               = azurerm_application_insights.appinsights.instrumentation_key
+    application_stack {
+      dotnet_version              = "v8.0"
+      use_dotnet_isolated_runtime = true
+    }
   }
 
-  identity {
-    type = "SystemAssigned"
+}
+
+# API Management Service
+resource "azurerm_api_management" "apim" {
+  name                = "${var.app_name}-${var.environment}-apim"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  publisher_name      = "Loro API"
+  publisher_email     = "admin@loro.local"
+  sku_name            = "Consumption_0"
+
+  tags = var.tags
+}
+
+# API Management Backend for Function App
+resource "azurerm_api_management_backend" "function_backend" {
+  name                = "${var.app_name}-function-backend"
+  resource_group_name = azurerm_resource_group.rg.name
+  api_management_name = azurerm_api_management.apim.name
+  protocol            = "http"
+  url                 = "https://${azurerm_windows_function_app.function_app.default_hostname}"
+}
+
+# API Management API
+resource "azurerm_api_management_api" "function_api" {
+  name                = "${var.app_name}-api"
+  resource_group_name = azurerm_resource_group.rg.name
+  api_management_name = azurerm_api_management.apim.name
+  revision            = "1"
+  display_name        = "Loro Function API"
+  path                = "loro"
+  protocols           = ["https"]
+  description         = "API for Loro HTTP Trigger Function"
+
+  service_url = "https://${azurerm_windows_function_app.function_app.default_hostname}"
+
+  import {
+    content_format = "openapi+json"
+    content_value = jsonencode({
+      openapi = "3.0.0"
+      info = {
+        title   = "Loro Function API"
+        version = "1.0.0"
+      }
+      servers = [{
+        url = "https://${azurerm_windows_function_app.function_app.default_hostname}"
+      }]
+      paths = {
+        "/api/LoroHttpTrigger" = {
+          get = {
+            summary     = "Get Loro data"
+            operationId = "LoroGet"
+            responses = {
+              "200" = {
+                description = "Success"
+              }
+            }
+            "x-azure-backend" = {
+              backend_id = azurerm_api_management_backend.function_backend.name
+            }
+          }
+          post = {
+            summary     = "Post Loro data"
+            operationId = "LoroPost"
+            requestBody = {
+              required = true
+              content = {
+                "application/json" = {
+                  schema = {
+                    type = "object"
+                    properties = {
+                      name  = { type = "string" }
+                      email = { type = "string" }
+                      age   = { type = "integer" }
+                    }
+                  }
+                }
+              }
+            }
+            responses = {
+              "200" = {
+                description = "Success"
+              }
+            }
+            "x-azure-backend" = {
+              backend_id = azurerm_api_management_backend.function_backend.name
+            }
+          }
+        }
+      }
+    })
+  }
+}
+
+# API Management Operation - GET
+resource "azurerm_api_management_api_operation" "get_loro" {
+  operation_id        = "get-loro"
+  api_name            = azurerm_api_management_api.function_api.name
+  api_management_name = azurerm_api_management.apim.name
+  resource_group_name = azurerm_resource_group.rg.name
+  display_name        = "Get Loro"
+  method              = "GET"
+  url_template        = "/LoroHttpTrigger"
+  description         = "Get request to Loro HTTP Trigger Function"
+
+  response {
+    status_code = 200
+  }
+}
+
+# API Management Operation - POST
+resource "azurerm_api_management_api_operation" "post_loro" {
+  operation_id        = "post-loro"
+  api_name            = azurerm_api_management_api.function_api.name
+  api_management_name = azurerm_api_management.apim.name
+  resource_group_name = azurerm_resource_group.rg.name
+  display_name        = "Post Loro"
+  method              = "POST"
+  url_template        = "/LoroHttpTrigger"
+  description         = "Post request to Loro HTTP Trigger Function"
+
+  request {
+    description = "Request body with name, email, age"
   }
 
-  tags = merge(var.tags, {
-    resource_name = "function_app"
-  })
+  response {
+    status_code = 200
+  }
+}
 
+# API Management API Policy (Function Key Authentication)
+resource "azurerm_api_management_api_policy" "function_api_policy" {
+  api_name            = azurerm_api_management_api.function_api.name
+  api_management_name = azurerm_api_management.apim.name
+  resource_group_name = azurerm_resource_group.rg.name
 
+  xml_content = <<XML
+<policies>
+  <inbound>
+    <base />
+    <set-backend-service base-url="https://${azurerm_windows_function_app.function_app.default_hostname}" />
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>
+XML
 }
 
 # Outputs
 output "function_app_id" {
-  value       = azurerm_function_app_flex_consumption.function_app.id
+  value       = azurerm_windows_function_app.function_app.id
   description = "Function App ID"
 }
 
 output "function_app_name" {
-  value       = azurerm_function_app_flex_consumption.function_app.name
+  value       = azurerm_windows_function_app.function_app.name
   description = "Function App Name"
 }
 
 output "function_app_default_hostname" {
-  value       = azurerm_function_app_flex_consumption.function_app.default_hostname
+  value       = azurerm_windows_function_app.function_app.default_hostname
   description = "Function App Default Hostname"
-}
-
-output "function_app_principal_id" {
-  value       = azurerm_function_app_flex_consumption.function_app.identity[0].principal_id
-  description = "Function App Principal ID for RBAC"
 }
 
 output "resource_group_name" {
@@ -177,4 +302,19 @@ output "appinsights_instrumentation_key" {
   value       = azurerm_application_insights.appinsights.instrumentation_key
   sensitive   = true
   description = "Application Insights Instrumentation Key"
+}
+
+output "apim_gateway_url" {
+  value       = azurerm_api_management.apim.gateway_url
+  description = "API Management Gateway URL"
+}
+
+output "apim_name" {
+  value       = azurerm_api_management.apim.name
+  description = "API Management Instance Name"
+}
+
+output "apim_api_endpoint" {
+  value       = "${azurerm_api_management.apim.gateway_url}/${azurerm_api_management_api.function_api.path}"
+  description = "API Management API Endpoint"
 }
